@@ -47,9 +47,9 @@ struct pc_tls_s {
 int pc_tls_init(pc_client_t* client);
 int pc_tls_clear(pc_client_t* client);
 
-int pc_tls_enc_out(pc_client* client);
-int pc_tls_clear_in(pc_client* client);
-int pc_tls_clear_out(pc_client* client);
+int pc_tls_enc_out(pc_client_t* client);
+int pc_tls_clear_in(pc_client_t* client);
+int pc_tls_clear_out(pc_client_t* client);
 
 int pc_tls_read_cb(uv_stream_t* stream, size_t* nread, const uv_buf_t* buf, uv_handle_type pending);
 
