@@ -165,4 +165,7 @@ void pc__pkg_cb(pc_pkg_type type, const char *data, size_t len,
  */
 void pc__client_clear(pc_client_t *client);
 
+
+void pc__client_write(pc_client_t *client);
+
 #endif /* PC_INTERNAL_H */

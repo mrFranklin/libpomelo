@@ -12,6 +12,7 @@
 
 static int _pc_verify_cert_hostname(X509* cert, pc_client_t* client);
 static int _pc_server_cert_verify(int ok, X509_STORE_CTX* ctx);
+static int cycle_depth;
 
 static int _pc_server_cert_verify(int ok, X509_STORE_CTX* ctx) {
   SSL* ssl;
@@ -225,6 +226,7 @@ next:
   SSL_set_app_data(tls->ssl, client);
   tls->in = BIO_new(BIO_s_mem());
   tls->out = BIO_new(BIO_s_mem());
+  tls->write_buf = BIO_new(BIO_s_mem());
   return 0;
 }
 
@@ -282,23 +284,110 @@ int pc_tls_clear(pc_client_t* client) {
 
 
 int pc_tls_enc_out(pc_client_t* client) {
-  // TODO
+  pc_tls_t* tls = client->tls;
+  if (nginx_queue_empty(tls->write_queue)) {
+    pc_tls_make_pending(client);
+  }
+
+  if (BIO_pending(tls->out) == 0) {
+    if (tls->write_size == 0) {
+      pc_tls_invoke_queued(client);
+    }
+    return ;
+  }
+
+  int len = BIO_pending(tls->out);
+  char* buf = (char*) malloc(len);
+
+  // TODO: error handle
+  BIO_read(tls->out, buf, len);
+
+  tls->write_req.data = client;
+
+  uv_buf_t buf[1];
+  buf[0] = uv_buf_init(buf, len);
+
+  // TODO: error handle
+
+  uv_write(&tls->write_req,(uv_stream_t*) client->transport->socket, &buf, 1, pc_tls_enc_out_cb); 
   return 0;
+}
+
+void pc_tls_enc_out_cb(uv_write_t* write_req, int status) {
+  // TODO: error handle
+
+  pc_client_t* client = (pc_client_t*) write_req->data;
+
+  pc_tls_t* tls = client->tls;
+
+  tls->write_size = 0;
+  pc_tls_enc_out(client);
 }
 
 int pc_tls_clear_in(pc_client_t* client) {
-  // TODO
+
+  pc_tls_t* tls = client->tls;
+  int written = 0;
+
+  while (tls->write_size > 0) {
+    written = SSL_write(tls->ssl, tls->write_buf, tls->write_size);
+    if (written == -1) {
+      break;
+    } else {
+      tls->write_size -= written;
+      memmove(tls->write_buf, tls->write_buf + written, tls->write_size);
+    }
+  }
+
+  // TODO: handle error
   return 0;
 }
 
-int pc_tls_clear_out(pc_client_t* client) {
-  // TODO
-  return 0;
+void pc_tls_clear_out(pc_client_t* client) {
+  char buf[1024];
+  int nread;
+  pc_tls_t* tls = client->tls;
+
+  do {
+    nread = SSL_read(tls->ssl, buf, 1024);
+    if (nread > 0) {
+      pc_client_on_tcp_read(client, buf, nread);
+    }
+  } while (nread > 0);
+
+  // TODO: error handling, shutdown handling
 }
 
-int pc_tls_read_cb(uv_stream_t* stream, size_t* nread, const uv_buf_t* buf, uv_handle_type pending) {
-  // TODO
-  return 0;
+int pc_tls_on_read(pc_client_t* client, char* buf, size_t nread) {
+  if (nread < 0) {
+    pc_tls_clear_out(client);
+    return 0;
+  }
+
+  pc_tls_t* tls = client->tls;
+  BIO_write(tls->in, buf, nread);
+  free(buf);
+  pc_tls_cycle(client);
 }
+
+void pc_tls_cycle(pc_client_t* client) {
+
+  if ( ++cycle_depth > 1) {
+    return;
+  }
+
+  pc_tls_clear_in(client);
+  pc_tls_clear_out(client);
+  pc_tls_enc_out(client);
+}
+
+void pc_tls_make_pending(pc_client_t* client) {
+  // TODO
+}
+
+void pc_tls_invoke_queued(pc_client_t* client, int status) {
+  // TODO:
+}
+
 
  

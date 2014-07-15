@@ -25,6 +25,7 @@ static void pc__release_requests(pc_map_t *map, const char* key, void *value);
 static void pc__client_reconnect_reset(pc_client_t *client);
 static void pc__client_reconnect_timer_cb(uv_timer_t* timer, int status);
 static void pc__client_reconnect(pc_client_t *client);
+static void pc__write_async_cb(uv_async_t* async, int status);
 
 pc_client_t *pc_client_new() {
   pc_client_t *client = (pc_client_t *)malloc(sizeof(pc_client_t));
@@ -136,6 +137,11 @@ void pc__client_init(pc_client_t *client) {
   uv_mutex_init(&client->listener_mutex);
   uv_mutex_init(&client->state_mutex);
 
+  uv_mutex_init(&client->write_queue_mutex);
+  ngx_queue_init(&client->write_queue);
+  uv_async_init(client->uv_loop, &client->write_async, pc__write_async_cb);
+  client->write_async.data = client;
+
   // init package parser
   client->parse_msg = pc__default_msg_parse_cb;
   client->parse_msg_done = pc__default_msg_parse_done_cb;
@@ -163,6 +169,8 @@ pc_client_state pc_client_get_state(pc_client_t *client) {
   uv_mutex_unlock(&client->state_mutex);
   return state;
 }
+
+void 
   
 /**
  * Clear all inner resource of Pomelo client
@@ -571,6 +579,11 @@ void pc__close_async_cb(uv_async_t *handle, int status) {
   pc_client_t *client = (pc_client_t *)handle->data;
   pc_client_stop(client);
 }
+
+void pc__write_async_cb(uv_async_t *async, int) {
+  pc_client_t* client = (pc_client_t*) async->data;
+  pc__client_write(client);
+};
 
 int pc_client_lib_init()
 {

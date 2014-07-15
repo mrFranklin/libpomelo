@@ -36,9 +36,11 @@ struct pc_tls_s {
 
   BIO* in;
   BIO* out;
-  BIO* write_buf;
+
   uv_write_t write_req;
   int write_size;
+  int max;
+  char* write_buf;
 
   ngx_queue_t write_queue;
   ngx_queue_t pending_queue;

@@ -213,6 +213,7 @@ typedef struct {
   pc_transport_t *transport;                                                  \
   pc_req_type type;                                                           \
   void *data;                                                                 \
+  ngx_queue_t queue;
 
 #define PC_TCP_REQ_FIELDS                                                     \
   /* public */                                                                \
@@ -238,9 +239,8 @@ struct pc_tcp_req_s {
  * Pomelo client instance
  */
 struct pc_client_s {
-  /* public */
   pc_client_state state;
-  /* private */
+
   uv_loop_t *uv_loop;
   pc_transport_t *transport;
   pc_map_t *listeners;
@@ -262,11 +262,17 @@ struct pc_client_s {
   uv_timer_t *heartbeat_timer;
   uv_timer_t *timeout_timer;
   uv_async_t *close_async;
+
   uv_mutex_t mutex;
   uv_cond_t cond;
   uv_mutex_t listener_mutex;
   uv_thread_t worker;
-  
+
+  uv_async_t write_async;
+  ngx_queue_t write_queue;
+  uv_thread_t write_queue_mutex;
+
+  /* reconnect */
   uv_mutex_t state_mutex;
 
   uv_timer_t reconnect_timer;

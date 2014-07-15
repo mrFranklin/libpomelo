@@ -622,3 +622,6 @@ error:
   if(attach) free(attach);
   return -1;
 }
+
+void pc__client_write(pc_client_t* client) {
+}

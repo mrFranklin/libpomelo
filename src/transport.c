@@ -101,7 +101,11 @@ void pc_tp_on_tcp_read(uv_stream_t *socket, ssize_t nread, uv_buf_t buf) {
     return;
   }
 
+#if defined(WITH_TLS)
+  pc_tls_on_read(transport->client, buf.base, nread);
+#else
   pc_client_on_tcp_read(transport->client, buf.base, nread);
+#endif
 
 error:
   if(buf.len != -1) {
