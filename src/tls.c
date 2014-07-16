@@ -314,12 +314,8 @@ int pc_tls_enc_out(pc_client_t* client) {
 }
 
 void pc_tls_enc_out_cb(uv_write_t* write_req, int status) {
-  // TODO: error handle
-
   pc_client_t* client = (pc_client_t*) write_req->data;
-
   pc_tls_t* tls = client->tls;
-
   tls->write_size = 0;
   pc_tls_enc_out(client);
 }
